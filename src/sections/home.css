@@ -1,0 +1,9 @@
+/* Hide "Made with Spline" watermark */
+[data-spline-watermark] {
+  display: none !important;
+}
+
+/* Sometimes watermark is inside iframe */
+iframe {
+  pointer-events: auto;
+}
