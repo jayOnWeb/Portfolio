@@ -13,7 +13,6 @@ const VERT = `
   varying vec3  vPos;
   varying float vNoise;
 
-  // Classic 3D Simplex-style noise
   vec3 mod289(vec3 x){return x-floor(x*(1./289.))*289.;}
   vec4 mod289(vec4 x){return x-floor(x*(1./289.))*289.;}
   vec4 permute(vec4 x){return mod289(((x*34.)+1.)*x);}
@@ -62,21 +61,14 @@ const VERT = `
   void main(){
     vNormal = normal;
     float t = uTime * 0.38;
-    // Layered noise for organic morph
     float n1 = snoise(position * 1.2 + t * 0.5);
     float n2 = snoise(position * 2.4 - t * 0.3) * 0.5;
     float n3 = snoise(position * 4.8 + t * 0.7) * 0.25;
     float n  = n1 + n2 + n3;
     vNoise   = n;
-
-    // Mouse influence
     float mouseInfluence = dot(normalize(position), vec3(uMouse.x, uMouse.y, 0.5)) * 0.18;
-
-    // Displacement
     float disp = n * uMorphStrength * (1.0 + mouseInfluence);
-    // Scroll makes it explode outward
     disp += uScrollProgress * 0.6 * (n * 0.5 + 0.5);
-
     vec3 newPos = position + normal * disp;
     vPos = newPos;
     gl_Position = projectionMatrix * modelViewMatrix * vec4(newPos, 1.0);
@@ -96,28 +88,17 @@ const FRAG = `
 
   void main(){
     vec3 n = normalize(vNormal);
-    // Fresnel rim
     vec3 viewDir = normalize(cameraPosition - vPos);
     float fresnel = pow(1.0 - max(dot(n, viewDir), 0.0), 2.8);
-
-    // Iridescent color shift
     float t = uTime * 0.15;
     float band = sin(vNoise * 4.0 + t) * 0.5 + 0.5;
-
     vec3 col = mix(uColor1, uColor2, band);
     col = mix(col, uColor3, fresnel * 0.7);
-
-    // Scroll: shift to white-hot
     col = mix(col, vec3(0.9, 1.0, 1.0), uScrollProgress * 0.4);
-
-    // Specular highlight
     vec3 lightDir = normalize(vec3(2.0, 3.0, 2.0));
     float spec = pow(max(dot(reflect(-lightDir, n), viewDir), 0.0), 48.0);
     col += spec * 0.6;
-
-    // Edge glow
     col += uColor2 * fresnel * 0.8;
-
     gl_FragColor = vec4(col, 0.92);
   }
 `;
@@ -134,7 +115,6 @@ function ContactScene() {
     const el = mountRef.current;
     if (!el) return;
 
-    // ── Renderer ──
     const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     renderer.setSize(el.clientWidth, el.clientHeight);
@@ -142,12 +122,10 @@ function ContactScene() {
     renderer.shadowMap.enabled = false;
     el.appendChild(renderer.domElement);
 
-    // ── Scene / Camera ──
     const scene  = new THREE.Scene();
     const camera = new THREE.PerspectiveCamera(55, el.clientWidth / el.clientHeight, 0.1, 100);
     camera.position.set(0, 0, 5.5);
 
-    // ── Main morphing sphere ──
     const geo = new THREE.IcosahedronGeometry(1.6, 80);
     const mat = new THREE.ShaderMaterial({
       vertexShader:   VERT,
@@ -157,9 +135,9 @@ function ContactScene() {
         uMorphStrength: { value: 0.42 },
         uScrollProgress:{ value: 0 },
         uMouse:         { value: new THREE.Vector2(0, 0) },
-        uColor1:        { value: new THREE.Vector3(0.0, 0.75, 0.82) },  // teal
-        uColor2:        { value: new THREE.Vector3(0.0, 0.50, 0.56) },  // dark teal
-        uColor3:        { value: new THREE.Vector3(0.9, 1.00, 1.00) },  // white
+        uColor1:        { value: new THREE.Vector3(0.0, 0.75, 0.82) },
+        uColor2:        { value: new THREE.Vector3(0.0, 0.50, 0.56) },
+        uColor3:        { value: new THREE.Vector3(0.9, 1.00, 1.00) },
       },
       transparent: true,
       side: THREE.FrontSide,
@@ -167,15 +145,12 @@ function ContactScene() {
     const sphere = new THREE.Mesh(geo, mat);
     scene.add(sphere);
 
-    // ── Wireframe overlay ──
     const wireMat = new THREE.MeshBasicMaterial({
-      color: 0x1cd8d2, wireframe: true,
-      transparent: true, opacity: 0.05,
+      color: 0x1cd8d2, wireframe: true, transparent: true, opacity: 0.05,
     });
     const wireMesh = new THREE.Mesh(geo, wireMat);
     scene.add(wireMesh);
 
-    // ── Orbiting rings ──
     const rings = [];
     const ringDefs = [
       { r: 2.3,  tube: 0.007, color: 0x1cd8d2, opacity: 0.55, speed:  0.28, tiltX: 0.4, tiltY: 0.0 },
@@ -185,9 +160,7 @@ function ContactScene() {
     ];
     ringDefs.forEach(d => {
       const rGeo = new THREE.TorusGeometry(d.r, d.tube, 16, 160);
-      const rMat = new THREE.MeshBasicMaterial({
-        color: d.color, transparent: true, opacity: d.opacity,
-      });
+      const rMat = new THREE.MeshBasicMaterial({ color: d.color, transparent: true, opacity: d.opacity });
       const ring = new THREE.Mesh(rGeo, rMat);
       ring.rotation.x = d.tiltX;
       ring.rotation.y = d.tiltY;
@@ -196,91 +169,65 @@ function ContactScene() {
       rings.push(ring);
     });
 
-    // ── Orbiting energy orbs ──
     const orbs = [];
-    const orbCount = 6;
-    for (let i = 0; i < orbCount; i++) {
+    for (let i = 0; i < 6; i++) {
+      const t    = i / 6;
       const oGeo = new THREE.SphereGeometry(0.055, 12, 12);
-      const t    = i / orbCount;
-      const oMat = new THREE.MeshBasicMaterial({
-        color: t < 0.5 ? 0x1cd8d2 : 0x00bf8f,
-        transparent: true, opacity: 0.9,
-      });
-      const orb = new THREE.Mesh(oGeo, oMat);
-      orb.userData = { angle: (i / orbCount) * Math.PI * 2, radius: 2.3 + Math.random() * 0.4, speed: 0.5 + Math.random() * 0.4, yOffset: (Math.random() - 0.5) * 0.5 };
+      const oMat = new THREE.MeshBasicMaterial({ color: t < 0.5 ? 0x1cd8d2 : 0x00bf8f, transparent: true, opacity: 0.9 });
+      const orb  = new THREE.Mesh(oGeo, oMat);
+      orb.userData = { angle: (i / 6) * Math.PI * 2, radius: 2.3 + Math.random() * 0.4, speed: 0.5 + Math.random() * 0.4, yOffset: (Math.random() - 0.5) * 0.5 };
       scene.add(orb);
       orbs.push(orb);
-
-      // Trailing glow around each orb
-      const glowGeo = new THREE.SphereGeometry(0.13, 8, 8);
-      const glowMat = new THREE.MeshBasicMaterial({
-        color: 0x1cd8d2, transparent: true, opacity: 0.12,
-      });
-      const glow = new THREE.Mesh(glowGeo, glowMat);
-      orb.add(glow);
+      const glowMesh = new THREE.Mesh(
+        new THREE.SphereGeometry(0.13, 8, 8),
+        new THREE.MeshBasicMaterial({ color: 0x1cd8d2, transparent: true, opacity: 0.12 })
+      );
+      orb.add(glowMesh);
     }
 
-    // ── Particle nebula ──
     const PCOUNT = 2200;
     const pPos   = new Float32Array(PCOUNT * 3);
     const pCol   = new Float32Array(PCOUNT * 3);
     const pBase  = new Float32Array(PCOUNT * 3);
     const pPhase = new Float32Array(PCOUNT);
-
     for (let i = 0; i < PCOUNT; i++) {
-      const r     = 2.8 + Math.random() * 4.0;
+      const r = 2.8 + Math.random() * 4.0;
       const theta = Math.random() * Math.PI * 2;
       const phi   = Math.acos(2 * Math.random() - 1);
-      const x     = r * Math.sin(phi) * Math.cos(theta);
-      const y     = r * Math.sin(phi) * Math.sin(theta);
-      const z     = r * Math.cos(phi);
-      pBase[i*3]   = pPos[i*3]   = x;
+      const x = r * Math.sin(phi) * Math.cos(theta);
+      const y = r * Math.sin(phi) * Math.sin(theta);
+      const z = r * Math.cos(phi);
+      pBase[i*3] = pPos[i*3] = x;
       pBase[i*3+1] = pPos[i*3+1] = y;
       pBase[i*3+2] = pPos[i*3+2] = z;
-      // Color: teal shades
       const mix = Math.random();
-      pCol[i*3]   = 0.0;
-      pCol[i*3+1] = 0.6 + mix * 0.4;
-      pCol[i*3+2] = 0.5 + mix * 0.5;
-      pPhase[i]   = Math.random() * Math.PI * 2;
+      pCol[i*3] = 0.0; pCol[i*3+1] = 0.6 + mix * 0.4; pCol[i*3+2] = 0.5 + mix * 0.5;
+      pPhase[i] = Math.random() * Math.PI * 2;
     }
-
     const pGeo = new THREE.BufferGeometry();
     pGeo.setAttribute("position", new THREE.BufferAttribute(pPos, 3));
     pGeo.setAttribute("color",    new THREE.BufferAttribute(pCol, 3));
-    const pMat = new THREE.PointsMaterial({
-      size: 0.022, vertexColors: true,
-      transparent: true, opacity: 0.7, sizeAttenuation: true,
-    });
-    const pts = new THREE.Points(pGeo, pMat);
+    const pMat = new THREE.PointsMaterial({ size: 0.022, vertexColors: true, transparent: true, opacity: 0.7, sizeAttenuation: true });
+    const pts  = new THREE.Points(pGeo, pMat);
     scene.add(pts);
 
-    // ── Post: lens flare cross at center ──
-    const crossGeo = new THREE.BufferGeometry();
-    const crossVerts = new Float32Array([
-      -0.12,0,0,  0.12,0,0,
-       0,-0.12,0,  0,0.12,0,
-    ]);
+    const crossGeo   = new THREE.BufferGeometry();
+    const crossVerts = new Float32Array([-0.12,0,0, 0.12,0,0, 0,-0.12,0, 0,0.12,0]);
     crossGeo.setAttribute("position", new THREE.BufferAttribute(crossVerts, 3));
-    const crossMat = new THREE.LineBasicMaterial({
-      color: 0xffffff, transparent: true, opacity: 0.0,
-    });
-    const cross = new THREE.LineSegments(crossGeo, crossMat);
+    const crossMat = new THREE.LineBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.0 });
+    const cross    = new THREE.LineSegments(crossGeo, crossMat);
     scene.add(cross);
 
-    // ── Mouse handlers ──
     const onMove = (e) => {
       const rect = el.getBoundingClientRect();
-      const nx   = ((e.clientX - rect.left)  / rect.width  - 0.5) * 2;
-      const ny   = -((e.clientY - rect.top)  / rect.height - 0.5) * 2;
-      targetMouseR.current = { x: nx, y: ny };
+      targetMouseR.current = {
+        x:  ((e.clientX - rect.left) / rect.width  - 0.5) * 2,
+        y: -((e.clientY - rect.top)  / rect.height - 0.5) * 2,
+      };
     };
-    const onLeave = () => { targetMouseR.current = { x: 0, y: 0 }; };
-    const onClick = () => {
-      clickRef.current = true;
-      // Explosive ring pulse
+    const onLeave  = () => { targetMouseR.current = { x: 0, y: 0 }; };
+    const onClick  = () => {
       rings.forEach((r, i) => {
-        const origScale = r.scale.x;
         r.scale.setScalar(1.0);
         const dur = 600 + i * 80;
         const start = performance.now();
@@ -295,82 +242,56 @@ function ContactScene() {
         setTimeout(() => requestAnimationFrame(pulse), i * 40);
       });
     };
-
-    el.addEventListener("mousemove", onMove);
-    el.addEventListener("mouseleave", onLeave);
-    el.addEventListener("click", onClick);
-
-    // ── Scroll listener ──
     const onScroll = () => {
       const section = el.closest("section") || document.getElementById("contact");
       if (!section) return;
       const rect  = section.getBoundingClientRect();
       const total = section.offsetHeight + window.innerHeight;
-      const prog  = Math.max(0, Math.min(1, (-rect.top + window.innerHeight) / total));
-      scrollRef.current = prog;
+      scrollRef.current = Math.max(0, Math.min(1, (-rect.top + window.innerHeight) / total));
     };
-    window.addEventListener("scroll", onScroll, { passive: true });
-
-    // ── Resize ──
     const onResize = () => {
       camera.aspect = el.clientWidth / el.clientHeight;
       camera.updateProjectionMatrix();
       renderer.setSize(el.clientWidth, el.clientHeight);
     };
+
+    el.addEventListener("mousemove", onMove);
+    el.addEventListener("mouseleave", onLeave);
+    el.addEventListener("click", onClick);
+    window.addEventListener("scroll", onScroll, { passive: true });
     window.addEventListener("resize", onResize);
 
-    // ── Animate ──
     let raf;
     const clock = new THREE.Clock();
-
     const animate = () => {
       raf = requestAnimationFrame(animate);
       const t  = clock.getElapsedTime();
       const sp = scrollRef.current;
-
-      // Lerp mouse
       mouseRef.current.x += (targetMouseR.current.x - mouseRef.current.x) * 0.05;
       mouseRef.current.y += (targetMouseR.current.y - mouseRef.current.y) * 0.05;
-
-      // Update shader uniforms
       mat.uniforms.uTime.value           = t;
       mat.uniforms.uScrollProgress.value = sp;
       mat.uniforms.uMouse.value.set(mouseRef.current.x, mouseRef.current.y);
-      // Morph strength pulses with mouse distance
       const md = Math.sqrt(mouseRef.current.x**2 + mouseRef.current.y**2);
       mat.uniforms.uMorphStrength.value  = 0.42 + md * 0.28 + sp * 0.35;
-
-      // Sphere rotation tracks mouse
       sphere.rotation.y = t * 0.12 + mouseRef.current.x * 0.6;
       sphere.rotation.x = t * 0.07 + mouseRef.current.y * 0.4 + sp * 0.8;
       wireMesh.rotation.copy(sphere.rotation);
-
-      // Scale on scroll: expand → contract
       const scaleSp = 1.0 + Math.sin(sp * Math.PI) * 0.22;
       sphere.scale.setScalar(scaleSp);
       wireMesh.scale.setScalar(scaleSp);
-
-      // Rings drift
       rings.forEach((r, i) => {
         r.rotation.z += r.userData.speed * 0.008;
         r.rotation.x  = ringDefs[i].tiltX + mouseRef.current.y * (0.1 + i * 0.04) + sp * (i * 0.3);
         r.rotation.y  = ringDefs[i].tiltY + mouseRef.current.x * (0.08 + i * 0.03);
       });
-
-      // Orbs orbit
       orbs.forEach((o) => {
         o.userData.angle += o.userData.speed * 0.012 * (1 + sp * 2);
         const a = o.userData.angle;
         const r = o.userData.radius * (1 + sp * 0.4);
-        o.position.set(
-          Math.cos(a) * r,
-          o.userData.yOffset + Math.sin(t * 0.4 + a) * 0.3,
-          Math.sin(a) * r,
-        );
+        o.position.set(Math.cos(a) * r, o.userData.yOffset + Math.sin(t * 0.4 + a) * 0.3, Math.sin(a) * r);
         o.material.opacity = 0.9 - sp * 0.6;
       });
-
-      // Particles breathe + mouse parallax
       const pos = pGeo.attributes.position.array;
       for (let i = 0; i < PCOUNT; i++) {
         const ph = pPhase[i];
@@ -379,24 +300,17 @@ function ContactScene() {
         pos[i*3+2] = pBase[i*3+2] + Math.sin(t * 0.22 + ph) * 0.04;
       }
       pGeo.attributes.position.needsUpdate = true;
-      pts.rotation.y = t * 0.018 + sp * 0.5;
-      pts.rotation.x = mouseRef.current.y * 0.08;
+      pts.rotation.y  = t * 0.018 + sp * 0.5;
+      pts.rotation.x  = mouseRef.current.y * 0.08;
       pMat.opacity    = 0.7 - sp * 0.45;
-
-      // Lens cross on high scroll
       cross.material.opacity = sp > 0.4 ? (sp - 0.4) * 1.6 * 0.6 : 0;
-      const crossScale = 1.0 + sp * 3;
-      cross.scale.setScalar(crossScale);
+      cross.scale.setScalar(1.0 + sp * 3);
       cross.rotation.z = t * 0.5;
-
-      // Camera slight bob + scroll pullback
-      camera.position.z   = 5.5 + sp * 2.2;
-      camera.position.y   = Math.sin(t * 0.2) * 0.06 - sp * 0.5;
+      camera.position.z = 5.5 + sp * 2.2;
+      camera.position.y = Math.sin(t * 0.2) * 0.06 - sp * 0.5;
       camera.lookAt(0, 0, 0);
-
       renderer.render(scene, camera);
     };
-
     animate();
 
     return () => {
@@ -435,6 +349,20 @@ function Field({ label, type = "text", name, value, onChange, textarea, required
   );
 }
 
+// ─── Social links data ────────────────────────────────────────────────────────
+const SOCIALS = [
+  {
+    label: "GitHub",
+    href:  "https://github.com/jayOnWeb",
+    d: "M12 0C5.37 0 0 5.37 0 12c0 5.3 3.438 9.8 8.205 11.385.6.113.82-.258.82-.577 0-.285-.01-1.04-.015-2.04-3.338.724-4.042-1.61-4.042-1.61-.546-1.385-1.335-1.755-1.335-1.755-1.087-.744.084-.729.084-.729 1.205.084 1.838 1.236 1.838 1.236 1.07 1.835 2.809 1.305 3.495.998.108-.776.417-1.305.76-1.605-2.665-.3-5.466-1.332-5.466-5.93 0-1.31.465-2.38 1.235-3.22-.135-.303-.54-1.523.105-3.176 0 0 1.005-.322 3.3 1.23.96-.267 1.98-.399 3-.405 1.02.006 2.04.138 3 .405 2.28-1.552 3.285-1.23 3.285-1.23.645 1.653.24 2.873.12 3.176.765.84 1.23 1.91 1.23 3.22 0 4.61-2.805 5.625-5.475 5.92.42.36.81 1.096.81 2.22 0 1.606-.015 2.896-.015 3.286 0 .315.21.69.825.57C20.565 21.795 24 17.295 24 12c0-6.63-5.37-12-12-12",
+  },
+  {
+    label: "LinkedIn",
+    href:  "https://www.linkedin.com/in/jay-kacha-186722362/", // 👈 replace with your LinkedIn URL
+    d: "M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433c-1.144 0-2.063-.926-2.063-2.065 0-1.138.92-2.063 2.063-2.063 1.14 0 2.064.925 2.064 2.063 0 1.139-.925 2.065-2.064 2.065zm1.782 13.019H3.555V9h3.564v11.452zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.222 0h.003z",
+  },
+];
+
 // ─── Main Contact ─────────────────────────────────────────────────────────────
 export default function Contact() {
   const [form, setForm]     = useState({ name:"", email:"", subject:"", message:"" });
@@ -446,6 +374,7 @@ export default function Contact() {
   const opacity  = useTransform(scrollYProgress, [0, 0.15, 0.85, 1], [0, 1, 1, 0]);
 
   const handleChange = (e) => setForm(f => ({ ...f, [e.target.name]: e.target.value }));
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setStatus("sending");
@@ -489,7 +418,6 @@ export default function Contact() {
           min-height: 100vh;
         }
 
-        /* background grid */
         .ct-grid {
           position: absolute; inset: 0; z-index: 0; pointer-events: none;
           background-image:
@@ -503,13 +431,11 @@ export default function Contact() {
           background: linear-gradient(90deg, transparent, rgba(28,216,210,0.35), transparent);
         }
 
-        /* 3D canvas fills section */
         .ct-three {
           position: absolute; inset: 0; z-index: 2; pointer-events: none;
         }
         .ct-three > div { pointer-events: all; }
 
-        /* Scroll cue */
         .ct-scroll-cue {
           position: absolute; bottom: 28px; left: 50%; transform: translateX(-50%);
           z-index: 30; display: flex; flex-direction: column; align-items: center; gap: 6px;
@@ -528,7 +454,6 @@ export default function Contact() {
           100%{ transform: scaleY(1); transform-origin: bottom; opacity:0; }
         }
 
-        /* interaction hint */
         .ct-hint {
           position: absolute; bottom: 32px; right: 48px; z-index: 30;
           font-size: 0.58rem; letter-spacing: 0.16em; text-transform: uppercase;
@@ -537,7 +462,6 @@ export default function Contact() {
         }
         @keyframes ct-pulse-hint { 0%,100%{opacity:.3} 50%{opacity:.75} }
 
-        /* ── Layout ── */
         .ct-wrap {
           position: relative; z-index: 10;
           max-width: 1200px; margin: 0 auto;
@@ -553,7 +477,6 @@ export default function Contact() {
           .ct-three { display: none; }
         }
 
-        /* ── LEFT ── */
         .ct-tag {
           font-size: 0.72rem; font-weight: 500; letter-spacing: 0.22em;
           text-transform: uppercase; color: #1cd8d2;
@@ -624,7 +547,6 @@ export default function Contact() {
         }
         .ct-soc:hover { color:#1cd8d2; border-color:rgba(28,216,210,.3); background:rgba(28,216,210,.06); transform:translateY(-3px); }
 
-        /* ── Form shell ── */
         .ct-form-shell {
           border-radius: 24px;
           border: 1px solid rgba(255,255,255,0.08);
@@ -648,7 +570,6 @@ export default function Contact() {
         }
         .ct-form-sub { font-size:.8rem; color:rgba(255,255,255,.28); margin-bottom:28px; }
 
-        /* ── Fields ── */
         .ctf-field { position:relative; margin-bottom:26px; }
         .ctf-label {
           position:absolute; top:0; left:0;
@@ -675,7 +596,6 @@ export default function Contact() {
         }
         .ctf-field.focused .ctf-line::after { left:0; right:0; }
 
-        /* ── Submit ── */
         .ct-submit {
           position:relative; width:100%; overflow:hidden;
           border-radius:14px;
@@ -700,7 +620,6 @@ export default function Contact() {
         .ct-submit-arr { transition:transform .3s; }
         .ct-submit:hover .ct-submit-arr { transform:translateX(4px); }
 
-        /* sent */
         .ct-sent { text-align:center; padding:44px 20px; }
         .ct-sent-icon {
           width:62px; height:62px; border-radius:50%;
@@ -723,7 +642,6 @@ export default function Contact() {
         <div className="ct-grid"/>
         <div className="ct-topline"/>
 
-        {/* ── Three.js ── */}
         <div className="ct-three">
           <ContactScene />
         </div>
@@ -764,7 +682,9 @@ export default function Contact() {
               </div>
             </motion.div>
 
-            <motion.a href="mailto:jaykacha577@gmail.com" className="ct-email-link"
+            <motion.a
+              href="mailto:jaykacha577@gmail.com"
+              className="ct-email-link"
               variants={fadeUp} initial="hidden" whileInView="visible" viewport={{once:true}} custom={4}>
               <span className="ct-email-icon">
                 <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -779,14 +699,21 @@ export default function Contact() {
               <span className="ct-email-arr">↗</span>
             </motion.a>
 
+            {/* ── Socials with real links ── */}
             <motion.div className="ct-socials"
               variants={fadeUp} initial="hidden" whileInView="visible" viewport={{once:true}} custom={5}>
-              {[
-                { label:"GitHub",   d:"M12 0C5.37 0 0 5.37 0 12c0 5.3 3.438 9.8 8.205 11.385.6.113.82-.258.82-.577 0-.285-.01-1.04-.015-2.04-3.338.724-4.042-1.61-4.042-1.61-.546-1.385-1.335-1.755-1.335-1.755-1.087-.744.084-.729.084-.729 1.205.084 1.838 1.236 1.838 1.236 1.07 1.835 2.809 1.305 3.495.998.108-.776.417-1.305.76-1.605-2.665-.3-5.466-1.332-5.466-5.93 0-1.31.465-2.38 1.235-3.22-.135-.303-.54-1.523.105-3.176 0 0 1.005-.322 3.3 1.23.96-.267 1.98-.399 3-.405 1.02.006 2.04.138 3 .405 2.28-1.552 3.285-1.23 3.285-1.23.645 1.653.24 2.873.12 3.176.765.84 1.23 1.91 1.23 3.22 0 4.61-2.805 5.625-5.475 5.92.42.36.81 1.096.81 2.22 0 1.606-.015 2.896-.015 3.286 0 .315.21.69.825.57C20.565 21.795 24 17.295 24 12c0-6.63-5.37-12-12-12" },
-                { label:"LinkedIn", d:"M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433c-1.144 0-2.063-.926-2.063-2.065 0-1.138.92-2.063 2.063-2.063 1.14 0 2.064.925 2.064 2.063 0 1.139-.925 2.065-2.064 2.065zm1.782 13.019H3.555V9h3.564v11.452zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.222 0h.003z" },
-              ].map(s => (
-                <a key={s.label} href="#" className="ct-soc" aria-label={s.label}>
-                  <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><path d={s.d}/></svg>
+              {SOCIALS.map(s => (
+                <a
+                  key={s.label}
+                  href={s.href}
+                  className="ct-soc"
+                  aria-label={s.label}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor">
+                    <path d={s.d}/>
+                  </svg>
                 </a>
               ))}
             </motion.div>
@@ -809,7 +736,7 @@ export default function Contact() {
                 <div className="ct-sent">
                   <div className="ct-sent-icon" style={{color:"#ff6b6b",borderColor:"rgba(255,107,107,0.3)",background:"rgba(255,107,107,0.08)"}}>✕</div>
                   <h3 className="ct-sent-title">Failed to send</h3>
-                  <p className="ct-sent-sub">Something went wrong. Email me directly at jay@example.com</p>
+                  <p className="ct-sent-sub">Something went wrong. Email me directly at jaykacha577@gmail.com</p>
                   <button onClick={() => setStatus("idle")} style={{marginTop:"16px",background:"transparent",border:"1px solid rgba(255,255,255,0.15)",color:"rgba(255,255,255,0.5)",padding:"8px 20px",borderRadius:"999px",cursor:"pointer",fontSize:"0.75rem",letterSpacing:"0.1em",fontFamily:"Syne,sans-serif"}}>Try Again</button>
                 </div>
               ) : (
@@ -818,11 +745,11 @@ export default function Contact() {
                   <p className="ct-form-sub">Fill out the form and I'll reply as soon as possible.</p>
                   <form onSubmit={handleSubmit}>
                     <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:"0 20px"}}>
-                      <Field label="Your Name"     name="name"    value={form.name}    onChange={handleChange} required/>
-                      <Field label="Email"         name="email"   value={form.email}   onChange={handleChange} type="email" required/>
+                      <Field label="Your Name" name="name"    value={form.name}    onChange={handleChange} required/>
+                      <Field label="Email"     name="email"   value={form.email}   onChange={handleChange} type="email" required/>
                     </div>
-                    <Field label="Subject"         name="subject" value={form.subject} onChange={handleChange} required/>
-                    <Field label="Message"         name="message" value={form.message} onChange={handleChange} textarea required/>
+                    <Field label="Subject"     name="subject" value={form.subject} onChange={handleChange} required/>
+                    <Field label="Message"     name="message" value={form.message} onChange={handleChange} textarea required/>
                     <button type="submit" className="ct-submit" disabled={status==="sending"}>
                       <span className="ct-submit-fill"/>
                       {status==="sending"
