@@ -1,21 +1,102 @@
-<<<<<<< HEAD
-# React + Vite
+# 🚀 Jay's Developer Portfolio
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+A modern, interactive portfolio website built to showcase my projects, skills, and technical journey.
 
-Currently, two official plugins are available:
+🌐 Live Website: https://portfolio-jay0811.vercel.app/
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) (or [oxc](https://oxc.rs) when used in [rolldown-vite](https://vite.dev/guide/rolldown)) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+---
 
-## React Compiler
+## ✨ Features
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+- ⚡ Built with React + Vite for high performance
+- 🌌 Interactive 3D elements using Three.js
+- 🎨 Clean and modern UI design
+- 🔄 Custom animated 0–100 loading screen
+- 📩 Functional contact form powered by EmailJS
+- 📱 Fully responsive across devices
+- 🚀 Deployed on Vercel
 
-## Expanding the ESLint configuration
+---
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
-=======
-# Portfolio
-My Portfolio website
->>>>>>> 1c0fe0c82f70852a2f9e0b5faa343d51aadb8362
+## 🛠️ Tech Stack
+
+- **Frontend:** React, Vite
+- **3D Rendering:** Three.js
+- **Email Service:** EmailJS
+- **Deployment:** Vercel
+- **Version Control:** Git & GitHub
+
+---
+
+## 📂 Project Structure
+
+```
+src/
+ ├── components/
+ │     ├── Loader.jsx
+ │     ├── Navbar.jsx
+ │     ├── Contact.jsx
+ │     └── ...
+ ├── App.jsx
+ └── main.jsx
+
+public/
+ └── favicon.ico
+```
+
+---
+
+## 🧪 Run Locally
+
+Clone the repository:
+
+```
+git clone https://github.com/your-username/your-repo-name.git
+```
+
+Install dependencies:
+
+```
+npm install
+```
+
+Start development server:
+
+```
+npm run dev
+```
+
+Build for production:
+
+```
+npm run build
+```
+
+---
+
+## 🚀 Deployment
+
+This project is deployed using Vercel.  
+Every push to the `main` branch triggers automatic production deployment.
+
+---
+
+## 🎯 Future Improvements
+
+- Performance optimization for 3D assets
+- Backend integration for storing messages
+- Enhanced animations and transitions
+- Blog or case study section
+
+---
+
+## 👨‍💻 Author
+
+**Jay**  
+Engineering Student | Frontend Developer  
+
+Focused on building modern, interactive web experiences.
+
+---
+
+⭐ If you like this project, consider giving it a star!
